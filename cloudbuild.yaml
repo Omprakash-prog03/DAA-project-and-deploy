@@ -1,0 +1,54 @@
+# ===================================================================
+# Google Cloud Build config for EV Charging Station Placement & Route Planning
+# ===================================================================
+# This file is used by Google Cloud Build to:
+#   1. Build the Docker image
+#   2. Push it to Google Container Registry (GCR) / Artifact Registry
+#
+# Usage:
+#   gcloud builds submit --config cloudbuild.yaml
+#
+# Or trigger automatically on every push to main branch via GitHub integration.
+# ===================================================================
+
+steps:
+  # Step 1: Build the Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/ev-charging-planner:latest'
+      - '.'
+
+  # Step 2: Push the image to Google Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/ev-charging-planner:latest'
+
+  # Step 3: Deploy to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - 'ev-charging-planner'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/ev-charging-planner:latest'
+      - '--platform'
+      - 'managed'
+      - '--region'
+      - 'us-central1'
+      - '--allow-unauthenticated'
+      - '--memory'
+      - '512Mi'
+      - '--min-instances'
+      - '0'
+      - '--max-instances'
+      - '3'
+      - '--set-env-vars'
+      - 'CORS_ORIGINS=*'
+
+timeout: '1200s'
+options:
+  logging: 'CLOUD_LOGGING_ONLY'
