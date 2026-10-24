@@ -35,13 +35,13 @@ SECURITY_HEADERS = {
     "Referrer-Policy": "strict-origin-when-cross-origin",
     "Content-Security-Policy": (
         "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline' https://unpkg.com; "
-        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com; "
+        "script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
         "img-src 'self' data: blob: https://*.google.com https://*.basemaps.cartocdn.com "
         "https://*.tile.openstreetmap.org; "
         "font-src 'self' https://fonts.gstatic.com data:; "
         "connect-src 'self' https://*.google.com https://*.basemaps.cartocdn.com "
-        "https://*.tile.openstreetmap.org https://unpkg.com; "
+        "https://*.tile.openstreetmap.org; "
         "frame-ancestors 'none'; "
         "form-action 'self'"
     ),
