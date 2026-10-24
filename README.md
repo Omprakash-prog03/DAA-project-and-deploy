@@ -168,23 +168,34 @@ python -m pytest tests/test_backend_api.py tests/test_security.py tests/test_mst
 
 The application is **deployment-ready**. The recommended deployment method is **Railway** — it's the simplest path with a free tier and automatic builds from GitHub.
 
-### 8.1 Deploy to Railway (Recommended)
+### 8.1 Deploy to Fly.io (Recommended — Free Tier, Auto-TLS)
 
-1. **Push your code to GitHub** (already done if using this repo).
-2. **Go to [railwayapp.com](https://railwayapp.com)** and sign up (free tier available).
-3. **Click "New Project"** → "Import from GitHub" → select `Omprakash-prog03/DAA-project-and-deploy`.
-4. **Railway auto-detects the `Procfile`** and starts the app automatically. No manual config needed.
-5. **Wait for deployment** (~1-2 minutes). Railway shows live logs.
-6. **Visit your app** at the URL Railway provides (e.g., `https://ev-charging-planner.up.railway.app`).
+**Prerequisites:** Install the Fly CLI: `curl -L https://fly.io/install | sh`
 
-**Optional: Set environment variables** in Railway → Settings → Variables:
+```bash
+# 1. Push your code to GitHub (already done)
 
-| Variable | Purpose | Default |
-|---|---|---|
-| `OPENCHARGEMAP_API_KEY` | Open Charge Map API key (optional) | empty (OSM fallback) |
-| `OPENROUTESERVICE_API_KEY` | OpenRouteService API key (optional) | empty (OSRM fallback) |
-| `CORS_ORIGINS` | Allowed CORS origins (comma-separated) | `*` |
-| `RATE_LIMITS` | Per-IP rate limits (`prefix:max:window`) | sensible defaults |
+# 2. Log in to Fly.io
+fly auth login
+
+# 3. Create the app (uses fly.toml automatically)
+fly launch --copy-config --no-deploy
+
+# 4. Deploy
+fly deploy
+
+# 5. Check status
+fly status
+
+# 6. Visit your app
+fly open
+```
+
+Your app will be live at `https://ev-charging-planner.fly.dev` (free tier, auto-scales to zero when no traffic).
+
+**Optional environment variables** in `fly.toml` or via `fly secrets set`:
+- `OPENCHARGEMAP_API_KEY` — Open Charge Map API key (optional)
+- `OPENROUTESERVICE_API_KEY` — OpenRouteService API key (optional)
 
 The app works without any API keys — it uses OpenStreetMap infrastructure as a fallback.
 
@@ -203,7 +214,28 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
-### 8.3 Deploy to Other PaaS (Heroku / Render / Cloud Run)
+### 8.3 Deploy to Google Cloud Run
+
+```bash
+# 1. Install gcloud CLI and authenticate
+gcloud auth login
+gcloud config set project YOUR_PROJECT_ID
+
+# 2. Build and push the Docker image
+gcloud builds submit --tag gcr.io/YOUR_PROJECT_ID/ev-planner
+
+# 3. Deploy
+gcloud run deploy ev-planner \
+  --image gcr.io/YOUR_PROJECT_ID/ev-planner \
+  --platform managed \
+  --region us-central1 \
+  --allow-unauthenticated \
+  --memory 512Mi \
+  --min-instances 0 \
+  --max-instances 1
+```
+
+### 8.4 Deploy to Other PaaS (Heroku / Railway / Render)
 
 The `Procfile` starts gunicorn with uvicorn workers automatically:
 
@@ -212,12 +244,12 @@ The `Procfile` starts gunicorn with uvicorn workers automatically:
 heroku create your-app-name
 git push heroku main
 
-# Render / Cloud Run
+# Railway / Render
 # Connect the repo; the app starts via the Procfile on the provided PORT.
 # Set environment variables in the platform dashboard.
 ```
 
-### 8.4 Deploy on a VPS (manual)
+### 8.5 Deploy on a VPS (manual)
 
 ```bash
 # 1. Install Python 3.11+
@@ -234,7 +266,7 @@ cp .env.example .env  # edit keys
 #    Proxy / to http://127.0.0.1:8085
 ```
 
-### 8.5 Production Checklist
+### 8.6 Production Checklist
 
 - [ ] Set `CORS_ORIGINS` to your production domain (or leave default)
 - [ ] Configure `RATE_LIMITS` for your expected traffic
