@@ -166,25 +166,30 @@ python -m pytest tests/test_backend_api.py tests/test_security.py tests/test_mst
 
 ## 8. Deployment Guide
 
-The application is **deployment-ready**. The recommended deployment method is **Railway** — it's the simplest path with a free tier and automatic builds from GitHub.
+The application is **deployment-ready** on **Render**. It ships with a `Dockerfile`, `render.yaml`, `Procfile`, and a production `start.sh` script.
 
-### 8.1 Deploy to Railway (Recommended)
+### 8.1 Deploy to Render (Recommended)
 
-1. **Push your code to GitHub** (already done if using this repo).
-2. **Go to [railwayapp.com](https://railwayapp.com)** and sign up (free tier available).
-3. **Click "New Project"** → "Import from GitHub" → select `Omprakash-prog03/DAA-project-and-deploy`.
-4. **Railway auto-detects the `Procfile`** and starts the app automatically. No manual config needed.
-5. **Wait for deployment** (~1-2 minutes). Railway shows live logs.
-6. **Visit your app** at the URL Railway provides (e.g., `https://ev-charging-planner.up.railway.app`).
+1. **Push your code to GitHub** (already done).
+2. **Go to [render.com](https://render.com)** and sign up (free tier available).
+3. **Click "New Service"** → "Connect to GitHub" → select `Omprakash-prog03/DAA-project-and-deploy`.
+4. **Render detects `render.yaml`** automatically — Docker runtime, free tier, auto-deploy.
+5. **Click "Create Service"** and wait for deployment (~2-3 minutes).
+6. **Visit your app** at the URL Render provides (e.g., `https://ev-charging-planner.onrender.com`).
 
-**Optional: Set environment variables** in Railway → Settings → Variables:
+**How it works:**
+- Render builds the Docker image from your `Dockerfile`
+- Render sets a `$PORT` environment variable
+- `start.sh` reads `$PORT` and starts gunicorn on the correct port
+- Health check hits `/api/health` every 30 seconds
+
+**Optional: Set environment variables** in Render → Settings → Environment:
 
 | Variable | Purpose | Default |
 |---|---|---|
 | `OPENCHARGEMAP_API_KEY` | Open Charge Map API key (optional) | empty (OSM fallback) |
 | `OPENROUTESERVICE_API_KEY` | OpenRouteService API key (optional) | empty (OSRM fallback) |
-| `CORS_ORIGINS` | Allowed CORS origins (comma-separated) | `*` |
-| `RATE_LIMITS` | Per-IP rate limits (`prefix:max:window`) | sensible defaults |
+| `CORS_ORIGINS` | Allowed CORS origins | `*` |
 
 The app works without any API keys — it uses OpenStreetMap infrastructure as a fallback.
 
@@ -197,13 +202,9 @@ docker run -d -p 8085:8085 \
   -e OPENCHARGEMAP_API_KEY=your_key \
   -e OPENROUTESERVICE_API_KEY=your_key \
   ev-planner
-
-# Or with docker-compose (reads .env automatically)
-cp .env.example .env
-docker compose up -d --build
 ```
 
-### 8.3 Deploy to Other PaaS (Heroku / Render / Cloud Run)
+### 8.3 Deploy to Other PaaS (Heroku / Railway / Cloud Run)
 
 The `Procfile` starts gunicorn with uvicorn workers automatically:
 
@@ -212,7 +213,7 @@ The `Procfile` starts gunicorn with uvicorn workers automatically:
 heroku create your-app-name
 git push heroku main
 
-# Render / Cloud Run
+# Railway / Render / Cloud Run
 # Connect the repo; the app starts via the Procfile on the provided PORT.
 # Set environment variables in the platform dashboard.
 ```
@@ -236,7 +237,7 @@ cp .env.example .env  # edit keys
 
 ### 8.5 Production Checklist
 
-- [ ] Set `CORS_ORIGINS` to your production domain (or leave default)
+- [ ] Set `CORS_ORIGINS` to your production domain (or leave default `*`)
 - [ ] Configure `RATE_LIMITS` for your expected traffic
 - [ ] Add API keys for richer data (optional)
 - [ ] Put the app behind a reverse proxy (nginx/Caddy) with TLS

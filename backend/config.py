@@ -34,7 +34,7 @@ class Settings:
     # cross-origin access is not required in normal operation).
     CORS_ORIGINS: str = os.getenv(
         "CORS_ORIGINS",
-        "http://localhost:8085,http://127.0.0.1:8085",
+        "*",
     ).strip()
 
     # Per-IP rate limits: "path_prefix:max_requests:window_seconds"
@@ -65,7 +65,8 @@ class Settings:
     @property
     def cors_origin_list(self) -> list:
         origins = [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
-        return origins or ["http://localhost:8085", "http://127.0.0.1:8085"]
+        # Return the list as-is (including "*" for cross-origin access)
+        return origins or ["*"]
 
     @property
     def rate_limit_map(self) -> dict:

@@ -1,8 +1,0 @@
-# Railway deployment config
-# Railway auto-detects the Procfile — this file is optional but helps
-# Railway understand the project structure.
-
-[service.ev-charging-planner]
-# Railway reads the Procfile automatically and starts the app.
-# The app listens on $PORT (provided by Railway).
-# No build command or Docker image needed — Railway handles it.

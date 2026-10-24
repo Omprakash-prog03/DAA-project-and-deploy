@@ -82,66 +82,73 @@ def fetch_real_charging_stations(
             pass  # Fall through to OpenStreetMap verified data
 
     # 2. Query Live OpenStreetMap Overpass API for real charging stations
-    try:
-        radius_meters = int(radius_km * 1000)
-        overpass_url = "https://overpass-api.de/api/interpreter"
-        # Format coordinates with fixed precision to guarantee a valid Overpass QL
-        # string (avoids scientific notation and unexpected tokens).
-        query = f"""
-        [out:json][timeout:15];
-        (
-          node["amenity"="charging_station"](around:{radius_meters}, {latitude:.6f}, {longitude:.6f});
-          way["amenity"="charging_station"](around:{radius_meters}, {latitude:.6f}, {longitude:.6f});
-        );
-        out center {max_results};
-        """
-        headers = {
-            "User-Agent": settings.USER_AGENT,
-            "Accept": "application/json"
-        }
-        resp = requests.post(overpass_url, data=query, headers=headers, timeout=12)
-        if resp.status_code == 200:
-            osm_data = resp.json()
-            elements = osm_data.get("elements", [])
-            for el in elements:
-                tags = el.get("tags", {})
-                lat = el.get("lat") or el.get("center", {}).get("lat")
-                lon = el.get("lon") or el.get("center", {}).get("lon")
-                if lat is None or lon is None:
-                    continue
+    #    Try multiple Overpass endpoints for reliability
+    overpass_endpoints = [
+        "https://overpass-api.de/api/interpreter",
+        "https://overpass.kumi.systems/api/interpreter",
+        "https://overpass.osm.ch/api/interpreter",
+    ]
 
-                name = tags.get("name") or tags.get("operator") or f"OSM EV Hub #{el.get('id')}"
-                operator = tags.get("operator") or tags.get("brand") or "Public Charging Infrastructure"
-                socket_type = tags.get("socket:type2") or tags.get("socket:chademo") or tags.get("socket:type2_combo")
-                capacity = tags.get("capacity")
-                try:
-                    num_pts = int(capacity) if capacity else 1
-                except ValueError:
-                    num_pts = 1
+    radius_meters = int(radius_km * 1000)
+    query = f"""
+    [out:json][timeout:25];
+    (
+      node["amenity"="charging_station"](around:{radius_meters}, {latitude:.6f}, {longitude:.6f});
+      way["amenity"="charging_station"](around:{radius_meters}, {latitude:.6f}, {longitude:.6f});
+    );
+    out center {max_results};
+    """
+    headers = {
+        "User-Agent": settings.USER_AGENT,
+        "Accept": "application/json"
+    }
 
-                conns = [ConnectorInfo(
-                    title=socket_type or "Universal EV Connector",
-                    power_kw=None,
-                    quantity=num_pts
-                )]
+    for overpass_url in overpass_endpoints:
+        try:
+            resp = requests.post(overpass_url, data=query, headers=headers, timeout=25)
+            if resp.status_code == 200:
+                osm_data = resp.json()
+                elements = osm_data.get("elements", [])
+                for el in elements:
+                    tags = el.get("tags", {})
+                    lat = el.get("lat") or el.get("center", {}).get("lat")
+                    lon = el.get("lon") or el.get("center", {}).get("lon")
+                    if lat is None or lon is None:
+                        continue
 
-                stations.append(EVChargingStation(
-                    id=f"OSM-{el.get('id')}",
-                    name=name,
-                    latitude=float(lat),
-                    longitude=float(lon),
-                    address=tags.get("addr:street") or tags.get("addr:city") or "Geographic Coordinate Waypoint",
-                    city=tags.get("addr:city"),
-                    state=tags.get("addr:state"),
-                    country=tags.get("addr:country"),
-                    operator=operator,
-                    connectors=conns,
-                    number_of_points=num_pts,
-                    data_source="OpenStreetMap (Overpass Infrastructure API)"
-                ))
+                    name = tags.get("name") or tags.get("operator") or f"OSM EV Hub #{el.get('id')}"
+                    operator = tags.get("operator") or tags.get("brand") or "Public Charging Infrastructure"
+                    socket_type = tags.get("socket:type2") or tags.get("socket:chademo") or tags.get("socket:type2_combo")
+                    capacity = tags.get("capacity")
+                    try:
+                        num_pts = int(capacity) if capacity else 1
+                    except ValueError:
+                        num_pts = 1
 
-    except Exception:
-        pass
+                    conns = [ConnectorInfo(
+                        title=socket_type or "Universal EV Connector",
+                        power_kw=None,
+                        quantity=num_pts
+                    )]
+
+                    stations.append(EVChargingStation(
+                        id=f"OSM-{el.get('id')}",
+                        name=name,
+                        latitude=float(lat),
+                        longitude=float(lon),
+                        address=tags.get("addr:street") or tags.get("addr:city") or "Geographic Coordinate Waypoint",
+                        city=tags.get("addr:city"),
+                        state=tags.get("addr:state"),
+                        country=tags.get("addr:country"),
+                        operator=operator,
+                        connectors=conns,
+                        number_of_points=num_pts,
+                        data_source="OpenStreetMap (Overpass Infrastructure API)"
+                    ))
+                if stations:
+                    return stations
+        except Exception:
+            continue  # Try next Overpass endpoint
 
     return stations
 
