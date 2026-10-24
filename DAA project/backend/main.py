@@ -15,6 +15,7 @@ from backend.api import (
     stations_router,
     routing_router,
     optimization_router,
+    markers_router,
 )
 
 app = FastAPI(
@@ -209,6 +210,7 @@ app.include_router(geocode_router)
 app.include_router(stations_router)
 app.include_router(routing_router)
 app.include_router(optimization_router)
+app.include_router(markers_router)
 
 
 @app.get("/api/health", tags=["Health"])

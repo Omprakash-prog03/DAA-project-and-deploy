@@ -60,8 +60,13 @@ document.addEventListener('DOMContentLoaded', () => {
         mst: L.layerGroup().addTo(map),
         dijkstra: L.layerGroup().addTo(map),
         knapsack: L.layerGroup().addTo(map),
-        pins: L.layerGroup().addTo(map)
+        pins: L.layerGroup().addTo(map),
+        markers: L.layerGroup().addTo(map)
     };
+
+    // Persistent marker store (shared across all users)
+    const persistentMarkers = []; // { id, name, lat, lon, note, color, icon, created_at }
+    const markerIcons = {};       // marker_id -> Leaflet marker
 
     // 4. DOM ELEMENTS
     const searchForm = document.getElementById('search-form');
@@ -619,7 +624,7 @@ document.addEventListener('DOMContentLoaded', () => {
     closeModalBtn.addEventListener('click', closeModal);
     cancelModalBtn.addEventListener('click', closeModal);
 
-    confirmStationBtn.addEventListener('click', () => {
+    confirmStationBtn.addEventListener('click', async () => {
         if (!state.pendingDropCoords) return;
 
         const name = customNameInp.value.trim() || `Candidate Hub #${state.candidates.size + 1}`;
@@ -643,6 +648,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
         state.candidates.set(id, newStation);
         state.realStations.push(newStation);
+
+        // Save as a persistent marker visible to everyone
+        const saved = await saveMarker(
+            name,
+            state.pendingDropCoords.lat,
+            state.pendingDropCoords.lng,
+            `Cost: ₹${cost} | Benefit: ${val} pts`,
+            '#F59E42',
+            '📌'
+        );
 
         closeModal();
         stationsEmptyState.classList.add('hidden');
@@ -1061,7 +1076,85 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // 18. RESET / CLEAR ANALYSIS
+    // 18. PERSISTENT MARKERS (shared across all users)
+    function loadPersistentMarkers() {
+        fetch('/api/markers')
+            .then(r => r.json())
+            .then(markers => {
+                persistentMarkers.length = 0;
+                markers.forEach(m => persistentMarkers.push(m));
+                renderPersistentMarkers();
+            })
+            .catch(err => {
+                console.warn('Failed to load markers:', err);
+            });
+    }
+
+    function renderPersistentMarkers() {
+        layers.markers.clearLayers();
+        Object.values(markerIcons).forEach(m => { try { layers.markers.removeLayer(m); } catch(e){} });
+        Object.keys(markerIcons).forEach(k => delete markerIcons[k]);
+
+        persistentMarkers.forEach(m => {
+            const icon = L.divIcon({
+                className: 'persistent-marker',
+                html: `<div class="pm-pin" style="background:${m.color}">${m.icon}</div>`,
+                iconSize: [30, 30],
+                iconAnchor: [15, 30],
+                popupAnchor: [0, -28]
+            });
+            const marker = L.marker([m.latitude, m.longitude], { icon }).addTo(layers.markers);
+            marker.bindPopup(`
+                <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 12px; color: #111; max-width: 220px;">
+                    <strong style="font-size: 13px;">${escapeHtml(m.name)}</strong><br>
+                    <span style="color: #555; font-size: 11px;">${escapeHtml(m.note || '')}</span>
+                    <div style="margin-top: 6px; font-size: 10px; color: #777;">👤 ${escapeHtml(m.created_by)} · ${escapeHtml(m.created_at || '')}</div>
+                    <div style="margin-top: 6px;">
+                        <button onclick="deleteMarker(${m.id})" style="background:#FF4D4F;color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;">Delete</button>
+                    </div>
+                </div>
+            `);
+            markerIcons[m.id] = marker;
+        });
+    }
+
+    async function saveMarker(name, lat, lon, note, color, icon) {
+        try {
+            const resp = await fetch('/api/markers', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, latitude: lat, longitude: lon, note, color, icon, created_by: 'deployer' })
+            });
+            if (resp.ok) {
+                const marker = await resp.json();
+                persistentMarkers.push(marker);
+                renderPersistentMarkers();
+                return true;
+            }
+        } catch (err) {
+            console.warn('Failed to save marker:', err);
+        }
+        return false;
+    }
+
+    window.deleteMarker = async function(markerId) {
+        try {
+            const resp = await fetch(`/api/markers/${markerId}`, { method: 'DELETE' });
+            if (resp.ok) {
+                const idx = persistentMarkers.findIndex(m => m.id === markerId);
+                if (idx >= 0) persistentMarkers.splice(idx, 1);
+                renderPersistentMarkers();
+                showToast('info', 'Marker deleted', 'The marker has been removed from the shared map');
+            }
+        } catch (err) {
+            showToast('error', 'Delete failed', 'Could not delete the marker');
+        }
+    };
+
+    // Load persistent markers on startup
+    loadPersistentMarkers();
+
+    // 19. RESET / CLEAR ANALYSIS
     resetBtn.addEventListener('click', () => {
         Object.values(layers).forEach(layer => layer.clearLayers());
         state.realStations = [];

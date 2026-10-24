@@ -1341,3 +1341,55 @@ body, html {
 #map.cursor-crosshair .leaflet-container {
     cursor: crosshair !important;
 }
+
+/* ===================================================================
+   12. PERSISTENT MARKERS (shared across all users)
+   =================================================================== */
+.persistent-marker {
+    background: transparent;
+    border: none;
+}
+
+.pm-pin {
+    width: 30px;
+    height: 30px;
+    border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.5);
+    border: 2px solid rgba(255, 255, 255, 0.85);
+    transition: transform 0.15s ease;
+}
+
+.pm-pin:hover {
+    transform: rotate(-45deg) scale(1.15);
+}
+
+.pm-pin > * {
+    transform: rotate(45deg);
+    font-size: 13px;
+    line-height: 1;
+}
+
+/* Leaflet popup dark theme override */
+.leaflet-popup-content-wrapper {
+    background: #161A22 !important;
+    color: #ECEDEF !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 12px !important;
+    backdrop-filter: blur(20px);
+}
+
+.leaflet-popup-tip {
+    background: #161A22 !important;
+}
+
+.leaflet-popup-content {
+    margin: 12px 14px !important;
+}
+
+.leaflet-container a.leaflet-popup-close-button {
+    color: #8B8F97 !important;
+}
