@@ -164,7 +164,82 @@ python -m pytest tests/test_backend_api.py tests/test_security.py tests/test_mst
 
 ---
 
-## 8. Testing Instructions Using a Real Location (Viva Demonstration)
+## 8. Deployment Guide
+
+The application is **deployment-ready**. It ships with a `Dockerfile`,
+`docker-compose.yml`, a `Procfile`, and a production `start.sh` script.
+
+### 8.1 Environment Variables for Production
+
+Copy `.env.example` and fill in at minimum:
+
+| Variable | Purpose | Default |
+|---|---|---|
+| `OPENCHARGEMAP_API_KEY` | Open Charge Map API key (optional) | empty (OSM fallback) |
+| `OPENROUTESERVICE_API_KEY` | OpenRouteService API key (optional) | empty (OSRM fallback) |
+| `APP_HOST` | Bind address | `0.0.0.0` |
+| `APP_PORT` | Listen port | `8085` |
+| `CORS_ORIGINS` | Allowed CORS origins (comma-separated) | local origins |
+| `RATE_LIMITS` | Per-IP rate limits (`prefix:max:window`) | sensible defaults |
+
+### 8.2 Deploy with Docker (recommended)
+
+```bash
+# Build and run
+docker build -t ev-planner .
+docker run -d -p 8085:8085 \
+  -e OPENCHARGEMAP_API_KEY=your_key \
+  -e OPENROUTESERVICE_API_KEY=your_key \
+  ev-planner
+
+# Or with docker-compose (reads .env automatically)
+cp .env.example .env
+docker compose up -d --build
+```
+
+### 8.3 Deploy to PaaS (Heroku / Render / Railway / Cloud Run)
+
+The `Procfile` starts gunicorn with uvicorn workers automatically:
+
+```bash
+# Heroku
+heroku create your-app-name
+git push heroku main
+
+# Render / Railway
+# Connect the repo; the app starts via the Procfile on port 8085.
+# Set environment variables in the platform dashboard.
+```
+
+### 8.4 Deploy on a VPS (manual)
+
+```bash
+# 1. Install Python 3.11+
+# 2. Clone and set up
+git clone <your-repo> && cd DAA-project-and-deploy
+python -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env  # edit keys
+
+# 3. Start with the production script
+./start.sh
+
+# 4. (Optional) Run behind nginx with TLS
+#    Proxy / to http://127.0.0.1:8085
+```
+
+### 8.5 Production Checklist
+
+- [ ] Set `CORS_ORIGINS` to your production domain (or leave default for same-origin)
+- [ ] Configure `RATE_LIMITS` for your expected traffic
+- [ ] Add API keys for richer data (optional)
+- [ ] Put the app behind a reverse proxy (nginx/Caddy) with TLS
+- [ ] Verify `/api/health` returns `{"status":"healthy"}`
+- [ ] Run the test suite in CI: `python -m pytest tests/ -q`
+
+---
+
+## 9. Testing Instructions Using a Real Location (Viva Demonstration)
 
 1. Open **`http://127.0.0.1:8085`** in your browser.
 2. In the top search bar, enter **`Bhubaneswar`** (or **`Delhi`**, **`London`**, **`New York`**) and click **Search Area**.
