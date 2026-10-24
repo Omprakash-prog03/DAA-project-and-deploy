@@ -10,9 +10,8 @@ services:
     plan: free
     healthCheckPath: /api/health
     autoDeploy: true
-    buildCommand: docker build -t ev-charging-planner .
+    buildCommand: docker build -t ev-charging-planner "DAA project"
     startCommand: gunicorn -k uvicorn.workers.UvicornWorker backend.main:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120 --forwarded-allow-ips "*" --access-logfile - --error-logfile -
-    directory: "DAA project"
     envVars:
       - key: APP_HOST
         value: 0.0.0.0
