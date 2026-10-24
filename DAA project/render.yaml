@@ -1,0 +1,27 @@
+# ===================================================================
+# Render deployment configuration for EV Charging Station Planner
+# This file is automatically detected by Render on repo connection.
+# ===================================================================
+
+services:
+  - type: web
+    name: ev-charging-planner
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/health
+    autoDeploy: true
+    buildCommand: docker build -t ev-charging-planner .
+    startCommand: gunicorn -k uvicorn.workers.UvicornWorker backend.main:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120 --forwarded-allow-ips "*" --access-logfile - --error-logfile -
+    envVars:
+      - key: APP_HOST
+        value: 0.0.0.0
+      - key: APP_PORT
+        value: 8085
+      - key: CORS_ORIGINS
+        value: "*"
+      - key: OPENCHARGEMAP_API_KEY
+        sync: false
+      - key: OPENROUTESERVICE_API_KEY
+        sync: false
+      - key: HEIGIT_API_KEY
+        sync: false

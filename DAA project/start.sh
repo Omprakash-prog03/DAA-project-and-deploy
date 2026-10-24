@@ -1,7 +1,4 @@
 #!/usr/bin/env bash
-# ===================================================================
-# Production start script for EV Charging Station Placement & Route Planning
-# ===================================================================
 set -euo pipefail
 
 cd "$(dirname "$0")"
@@ -17,7 +14,6 @@ echo "  Host:    ${HOST}"
 echo "  Port:    ${PORT}"
 echo "  Workers: ${WORKERS}"
 
-# Use gunicorn with uvicorn workers if available, otherwise fall back to uvicorn
 if "${PYTHON}" -c "import gunicorn" 2>/dev/null; then
     exec "${PYTHON}" -m gunicorn \
         -k uvicorn.workers.UvicornWorker \
@@ -32,6 +28,5 @@ else
     exec "${PYTHON}" -m uvicorn backend.main:app \
         --host "${HOST}" \
         --port "${PORT}" \
-        --workers "${WORKERS}" \
-        --proxy-headers
+        --workers "${WORKERS}"
 fi
