@@ -166,36 +166,30 @@ python -m pytest tests/test_backend_api.py tests/test_security.py tests/test_mst
 
 ## 8. Deployment Guide
 
-The application is **deployment-ready**. The recommended deployment method is **Railway** — it's the simplest path with a free tier and automatic builds from GitHub.
+The application is **deployment-ready** on **Render**. It ships with a `Dockerfile`, `render.yaml`, `Procfile`, and a production `start.sh` script.
 
-### 8.1 Deploy to Fly.io (Recommended — Free Tier, Auto-TLS)
+### 8.1 Deploy to Render (Recommended)
 
-**Prerequisites:** Install the Fly CLI: `curl -L https://fly.io/install | sh`
+1. **Push your code to GitHub** (already done).
+2. **Go to [render.com](https://render.com)** and sign up (free tier available).
+3. **Click "New Service"** → "Connect to GitHub" → select `Omprakash-prog03/DAA-project-and-deploy`.
+4. **Render detects `render.yaml`** automatically — Docker runtime, free tier, auto-deploy.
+5. **Click "Create Service"** and wait for deployment (~2-3 minutes).
+6. **Visit your app** at the URL Render provides (e.g., `https://ev-charging-planner.onrender.com`).
 
-```bash
-# 1. Push your code to GitHub (already done)
+**How it works:**
+- Render builds the Docker image from your `Dockerfile`
+- Render sets a `$PORT` environment variable
+- `start.sh` reads `$PORT` and starts gunicorn on the correct port
+- Health check hits `/api/health` every 30 seconds
 
-# 2. Log in to Fly.io
-fly auth login
+**Optional: Set environment variables** in Render → Settings → Environment:
 
-# 3. Create the app (uses fly.toml automatically)
-fly launch --copy-config --no-deploy
-
-# 4. Deploy
-fly deploy
-
-# 5. Check status
-fly status
-
-# 6. Visit your app
-fly open
-```
-
-Your app will be live at `https://ev-charging-planner.fly.dev` (free tier, auto-scales to zero when no traffic).
-
-**Optional environment variables** in `fly.toml` or via `fly secrets set`:
-- `OPENCHARGEMAP_API_KEY` — Open Charge Map API key (optional)
-- `OPENROUTESERVICE_API_KEY` — OpenRouteService API key (optional)
+| Variable | Purpose | Default |
+|---|---|---|
+| `OPENCHARGEMAP_API_KEY` | Open Charge Map API key (optional) | empty (OSM fallback) |
+| `OPENROUTESERVICE_API_KEY` | OpenRouteService API key (optional) | empty (OSRM fallback) |
+| `CORS_ORIGINS` | Allowed CORS origins | `*` |
 
 The app works without any API keys — it uses OpenStreetMap infrastructure as a fallback.
 
@@ -208,34 +202,9 @@ docker run -d -p 8085:8085 \
   -e OPENCHARGEMAP_API_KEY=your_key \
   -e OPENROUTESERVICE_API_KEY=your_key \
   ev-planner
-
-# Or with docker-compose (reads .env automatically)
-cp .env.example .env
-docker compose up -d --build
 ```
 
-### 8.3 Deploy to Google Cloud Run
-
-```bash
-# 1. Install gcloud CLI and authenticate
-gcloud auth login
-gcloud config set project YOUR_PROJECT_ID
-
-# 2. Build and push the Docker image
-gcloud builds submit --tag gcr.io/YOUR_PROJECT_ID/ev-planner
-
-# 3. Deploy
-gcloud run deploy ev-planner \
-  --image gcr.io/YOUR_PROJECT_ID/ev-planner \
-  --platform managed \
-  --region us-central1 \
-  --allow-unauthenticated \
-  --memory 512Mi \
-  --min-instances 0 \
-  --max-instances 1
-```
-
-### 8.4 Deploy to Other PaaS (Heroku / Railway / Render)
+### 8.3 Deploy to Other PaaS (Heroku / Railway / Cloud Run)
 
 The `Procfile` starts gunicorn with uvicorn workers automatically:
 
@@ -244,12 +213,12 @@ The `Procfile` starts gunicorn with uvicorn workers automatically:
 heroku create your-app-name
 git push heroku main
 
-# Railway / Render
+# Railway / Render / Cloud Run
 # Connect the repo; the app starts via the Procfile on the provided PORT.
 # Set environment variables in the platform dashboard.
 ```
 
-### 8.5 Deploy on a VPS (manual)
+### 8.4 Deploy on a VPS (manual)
 
 ```bash
 # 1. Install Python 3.11+
@@ -266,9 +235,9 @@ cp .env.example .env  # edit keys
 #    Proxy / to http://127.0.0.1:8085
 ```
 
-### 8.6 Production Checklist
+### 8.5 Production Checklist
 
-- [ ] Set `CORS_ORIGINS` to your production domain (or leave default)
+- [ ] Set `CORS_ORIGINS` to your production domain (or leave default `*`)
 - [ ] Configure `RATE_LIMITS` for your expected traffic
 - [ ] Add API keys for richer data (optional)
 - [ ] Put the app behind a reverse proxy (nginx/Caddy) with TLS
