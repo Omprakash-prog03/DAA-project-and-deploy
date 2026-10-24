@@ -166,23 +166,29 @@ python -m pytest tests/test_backend_api.py tests/test_security.py tests/test_mst
 
 ## 8. Deployment Guide
 
-The application is **deployment-ready**. It ships with a `Dockerfile`,
-`docker-compose.yml`, a `Procfile`, and a production `start.sh` script.
+The application is **deployment-ready**. The recommended deployment method is **Railway** — it's the simplest path with a free tier and automatic builds from GitHub.
 
-### 8.1 Environment Variables for Production
+### 8.1 Deploy to Railway (Recommended)
 
-Copy `.env.example` and fill in at minimum:
+1. **Push your code to GitHub** (already done if using this repo).
+2. **Go to [railwayapp.com](https://railwayapp.com)** and sign up (free tier available).
+3. **Click "New Project"** → "Import from GitHub" → select `Omprakash-prog03/DAA-project-and-deploy`.
+4. **Railway auto-detects the `Procfile`** and starts the app automatically. No manual config needed.
+5. **Wait for deployment** (~1-2 minutes). Railway shows live logs.
+6. **Visit your app** at the URL Railway provides (e.g., `https://ev-charging-planner.up.railway.app`).
+
+**Optional: Set environment variables** in Railway → Settings → Variables:
 
 | Variable | Purpose | Default |
 |---|---|---|
 | `OPENCHARGEMAP_API_KEY` | Open Charge Map API key (optional) | empty (OSM fallback) |
 | `OPENROUTESERVICE_API_KEY` | OpenRouteService API key (optional) | empty (OSRM fallback) |
-| `APP_HOST` | Bind address | `0.0.0.0` |
-| `APP_PORT` | Listen port | `8085` |
-| `CORS_ORIGINS` | Allowed CORS origins (comma-separated) | local origins |
+| `CORS_ORIGINS` | Allowed CORS origins (comma-separated) | `*` |
 | `RATE_LIMITS` | Per-IP rate limits (`prefix:max:window`) | sensible defaults |
 
-### 8.2 Deploy with Docker (recommended)
+The app works without any API keys — it uses OpenStreetMap infrastructure as a fallback.
+
+### 8.2 Deploy with Docker (local / any platform)
 
 ```bash
 # Build and run
@@ -197,7 +203,7 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
-### 8.3 Deploy to PaaS (Heroku / Render / Railway / Cloud Run)
+### 8.3 Deploy to Other PaaS (Heroku / Render / Cloud Run)
 
 The `Procfile` starts gunicorn with uvicorn workers automatically:
 
@@ -206,8 +212,8 @@ The `Procfile` starts gunicorn with uvicorn workers automatically:
 heroku create your-app-name
 git push heroku main
 
-# Render / Railway
-# Connect the repo; the app starts via the Procfile on port 8085.
+# Render / Cloud Run
+# Connect the repo; the app starts via the Procfile on the provided PORT.
 # Set environment variables in the platform dashboard.
 ```
 
@@ -230,12 +236,11 @@ cp .env.example .env  # edit keys
 
 ### 8.5 Production Checklist
 
-- [ ] Set `CORS_ORIGINS` to your production domain (or leave default for same-origin)
+- [ ] Set `CORS_ORIGINS` to your production domain (or leave default)
 - [ ] Configure `RATE_LIMITS` for your expected traffic
 - [ ] Add API keys for richer data (optional)
 - [ ] Put the app behind a reverse proxy (nginx/Caddy) with TLS
 - [ ] Verify `/api/health` returns `{"status":"healthy"}`
-- [ ] Run the test suite in CI: `python -m pytest tests/ -q`
 
 ---
 
