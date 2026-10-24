@@ -1,0 +1,37 @@
+# ===================================================================
+# Fly.io deployment config for EV Charging Station Placement & Route Planning
+# ===================================================================
+# After pushing, run:
+#   fly launch --copy-config --no-deploy
+#   fly deploy
+# ===================================================================
+
+app = "ev-charging-planner"
+primary_region = "iad"       # Washington DC (change if closer to you)
+instance_size_weight = 1     # Free tier (shared CPU, 256MB RAM)
+instance_cpu_kind = "shared"
+instance_cpus = 0.5
+
+# Enable auto-scaling (scales to 0 when no traffic, back up on request)
+auto_start_machines = true
+auto_stop_machines = "stop"  # Stop after 30 min of no traffic (free tier)
+min_machines_running = 0
+
+[[services]]
+  # Serve the app on the public internet with automatic TLS
+  name = "web"
+  protocol = "tcp"
+  internal_port = 8085
+  auto_start_machines = true
+  auto_stop_machines = "stop"
+  min_machines_running = 0
+  processes = ["app"]
+
+  # Optional: custom domain (replace with your own)
+  # [[services.custom_domains]]
+  #   host = "ev-planner.yourdomain.com"
+
+# Environment variables (API keys are optional - app works with OSM free tier)
+[env]
+  APP_HOST = "0.0.0.0"
+  # CORS_ORIGINS will be set automatically by Fly.io proxy

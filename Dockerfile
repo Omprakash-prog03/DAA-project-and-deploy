@@ -1,5 +1,6 @@
 # ===================================================================
 # EV Charging Station Placement & Route Planning - Production Image
+# Works on ALL platforms: Fly.io, Google Cloud Run, Railway, Render, Heroku
 # ===================================================================
 FROM python:3.11-slim
 
@@ -25,24 +26,19 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application source
 COPY . .
 
+# Make entrypoint executable
+RUN chmod +x docker-entrypoint.sh
+
 # Set ownership and switch to non-root user
 RUN chown -R appuser:appuser /app
 USER appuser
 
-# Application port
+# Application port (default 8085, but entrypoint uses $PORT if set by platform)
 EXPOSE 8085
 
-# Health check hits the API health endpoint
+# Health check - use $PORT or fall back to 8085
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
-    CMD curl -fsS http://127.0.0.1:8085/api/health || exit 1
+    CMD curl -fsS http://127.0.0.1:${PORT:-8085}/api/health || exit 1
 
-# Run with gunicorn + uvicorn workers (production-grade)
-CMD ["gunicorn", \
-     "-k", "uvicorn.workers.UvicornWorker", \
-     "backend.main:app", \
-     "--bind", "0.0.0.0:8085", \
-     "--workers", "2", \
-     "--timeout", "120", \
-     "--forwarded-allow-ips", "*", \
-     "--access-logfile", "-", \
-     "--error-logfile", "-"]
+# Run with entrypoint script (uses $PORT from platform)
+ENTRYPOINT ["./docker-entrypoint.sh"]
