@@ -31,12 +31,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 3. TILE LAYERS (Google Earth Satellite, Google Hybrid, Carto Dark GIS, OSM Streets)
     const tileLayers = {
-        'google-earth': L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+        'google-earth': L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
             attribution: '&copy; Google Earth Satellite Imagery',
+            subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
             maxZoom: 20
         }),
-        'google-hybrid': L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+        'google-hybrid': L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
             attribution: '&copy; Google Earth Satellite Imagery &amp; Roads',
+            subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
             maxZoom: 20
         }),
         'carto-dark': L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {

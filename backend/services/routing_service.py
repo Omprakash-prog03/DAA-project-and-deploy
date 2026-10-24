@@ -68,27 +68,42 @@ def get_real_road_distance_matrix(locations: List[Coordinates]) -> DistanceMatri
     try:
         # Formulate coordinate string: lon1,lat1;lon2,lat2;...
         coords_str = ";".join(f"{loc.lon:.6f},{loc.lat:.6f}" for loc in locations)
-        osrm_url = f"http://router.project-osrm.org/table/v1/driving/{coords_str}?annotations=distance,duration"
+        osrm_url = f"https://router.project-osrm.org/table/v1/driving/{coords_str}?annotations=distance,duration"
         headers = {"User-Agent": settings.USER_AGENT}
-        resp = requests.get(osrm_url, headers=headers, timeout=12)
-        if resp.status_code == 200:
-            data = resp.json()
-            raw_distances = data.get("distances", [])
-            raw_durations = data.get("durations", [])
 
-            distances_km = [
-                [round(d / 1000.0, 3) if d is not None else 0.0 for d in row]
-                for row in raw_distances
-            ]
-            durations_min = [
-                [round(t / 60.0, 2) if t is not None else 0.0 for t in row]
-                for row in raw_durations
-            ]
-            return DistanceMatrixResponse(
-                distances_km=distances_km,
-                durations_min=durations_min,
-                data_source="OpenStreetMap Road Network (OSRM Driving Engine)"
-            )
+        # Retry up to 3 times with short backoff (OSRM public server is rate-limited)
+        for attempt in range(3):
+            try:
+                resp = requests.get(osrm_url, headers=headers, timeout=15)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    raw_distances = data.get("distances", [])
+                    raw_durations = data.get("durations", [])
+
+                    distances_km = [
+                        [round(d / 1000.0, 3) if d is not None else 0.0 for d in row]
+                        for row in raw_distances
+                    ]
+                    durations_min = [
+                        [round(t / 60.0, 2) if t is not None else 0.0 for t in row]
+                        for row in raw_durations
+                    ]
+                    return DistanceMatrixResponse(
+                        distances_km=distances_km,
+                        durations_min=durations_min,
+                        data_source="OpenStreetMap Road Network (OSRM Driving Engine)"
+                    )
+                elif resp.status_code in (429, 500, 503):
+                    # Rate limited or server error — retry after short delay
+                    if attempt < 2:
+                        import time
+                        time.sleep(1.0 * (attempt + 1))
+                        continue
+            except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
+                if attempt < 2:
+                    import time
+                    time.sleep(1.0 * (attempt + 1))
+                    continue
     except Exception:
         pass
 
@@ -153,26 +168,40 @@ def get_real_route_geometry(
     # 2. OSRM Road Directions Engine
     try:
         osrm_url = (
-            f"http://router.project-osrm.org/route/v1/driving/"
+            f"https://router.project-osrm.org/route/v1/driving/"
             f"{start_lon:.6f},{start_lat:.6f};{end_lon:.6f},{end_lat:.6f}"
             f"?overview=full&geometries=geojson"
         )
         headers = {"User-Agent": settings.USER_AGENT}
-        resp = requests.get(osrm_url, headers=headers, timeout=10)
-        if resp.status_code == 200:
-            data = resp.json()
-            routes = data.get("routes", [])
-            if routes:
-                route = routes[0]
-                dist_km = round(route.get("distance", 0) / 1000.0, 2)
-                dur_min = round(route.get("duration", 0) / 60.0, 1)
-                coords = route.get("geometry", {}).get("coordinates", [])
-                return RouteResponse(
-                    distance_km=dist_km,
-                    duration_min=dur_min,
-                    geometry_geojson=coords,
-                    data_source="OpenStreetMap Road Network (OSRM)"
-                )
+
+        # Retry up to 3 times with short backoff (OSRM public server is rate-limited)
+        for attempt in range(3):
+            try:
+                resp = requests.get(osrm_url, headers=headers, timeout=15)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    routes = data.get("routes", [])
+                    if routes:
+                        route = routes[0]
+                        dist_km = round(route.get("distance", 0) / 1000.0, 2)
+                        dur_min = round(route.get("duration", 0) / 60.0, 1)
+                        coords = route.get("geometry", {}).get("coordinates", [])
+                        return RouteResponse(
+                            distance_km=dist_km,
+                            duration_min=dur_min,
+                            geometry_geojson=coords,
+                            data_source="OpenStreetMap Road Network (OSRM)"
+                        )
+                elif resp.status_code in (429, 500, 503):
+                    if attempt < 2:
+                        import time
+                        time.sleep(1.0 * (attempt + 1))
+                        continue
+            except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
+                if attempt < 2:
+                    import time
+                    time.sleep(1.0 * (attempt + 1))
+                    continue
     except Exception:
         pass
 

@@ -99,32 +99,65 @@ def geocode_location(query: str) -> GeocodeResult:
         }
         resp = requests.get(nom_url, params=params, headers=headers, timeout=8)
 
-        if resp.status_code != 200:
-            raise HTTPException(
-                status_code=502,
-                detail=f"Geocoding service returned HTTP {resp.status_code}.",
-            )
+        if resp.status_code == 200:
+            data = resp.json()
+            if data:
+                item = data[0]
+                bbox = [float(b) for b in item.get("boundingbox", [])] if "boundingbox" in item else None
 
-        data = resp.json()
-        if not data:
+                result = GeocodeResult(
+                    query=clean_query,
+                    display_name=item.get("display_name", clean_query),
+                    latitude=float(item["lat"]),
+                    longitude=float(item["lon"]),
+                    bounding_box=bbox,
+                    data_source="OpenStreetMap Nominatim",
+                )
+                _geocode_cache.set(cache_key, result)
+                return result
+        # If Nominatim returned non-200 or empty, fall through to Open-Meteo
+    except Exception as exc:
+        logger.warning("Nominatim geocoding failed: %s", exc)
+        # Fall through to Open-Meteo fallback
+
+    # 3. Open-Meteo Geocoding API (free, no API key, no cloud-IP blocking)
+    try:
+        om_url = "https://geocoding-api.open-meteo.com/v1/search"
+        headers = {
+            "User-Agent": settings.USER_AGENT,
+            "Accept": "application/json",
+        }
+        params = {
+            "name": clean_query,
+            "count": 1,
+            "language": "en",
+            "format": "json",
+        }
+        resp = requests.get(om_url, params=params, headers=headers, timeout=8)
+
+        if resp.status_code == 200:
+            data = resp.json()
+            results = data.get("results", [])
+            if results:
+                item = results[0]
+                result = GeocodeResult(
+                    query=clean_query,
+                    display_name=item.get("name", clean_query),
+                    latitude=float(item["latitude"]),
+                    longitude=float(item["longitude"]),
+                    bounding_box=None,
+                    data_source="Open-Meteo Geocoding API",
+                )
+                _geocode_cache.set(cache_key, result)
+                return result
             raise HTTPException(
                 status_code=404,
                 detail=f"No geographic location found for query '{clean_query}'. Please verify spelling or try a nearby city.",
             )
-
-        item = data[0]
-        bbox = [float(b) for b in item.get("boundingbox", [])] if "boundingbox" in item else None
-
-        result = GeocodeResult(
-            query=clean_query,
-            display_name=item.get("display_name", clean_query),
-            latitude=float(item["lat"]),
-            longitude=float(item["lon"]),
-            bounding_box=bbox,
-            data_source="OpenStreetMap Nominatim",
+        raise HTTPException(
+            status_code=502,
+            detail=f"Geocoding service returned HTTP {resp.status_code}.",
         )
-        _geocode_cache.set(cache_key, result)
-        return result
 
     except requests.exceptions.Timeout:
         raise HTTPException(
@@ -132,7 +165,6 @@ def geocode_location(query: str) -> GeocodeResult:
             detail="Geocoding request timed out. Please check your internet connection and try again.",
         )
     except requests.exceptions.RequestException:
-        # Do not leak internal network exception details to the client.
         logger.error("Network error communicating with geocoding provider", exc_info=True)
         raise HTTPException(
             status_code=503,
