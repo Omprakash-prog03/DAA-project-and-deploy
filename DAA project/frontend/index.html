@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EV Charging Station Placement & Route Planning | Real Earth GIS</title>
+
+    <!-- Google Fonts: Plus Jakarta Sans + JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <!-- Leaflet Map CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+
+    <!-- Custom Glass GIS CSS -->
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div id="app-container">
+        <!-- Interactive Real Earth Map Container -->
+        <div id="map"></div>
+
+        <!-- Top Floating Search & Action Header -->
+        <header id="top-header" class="glass-panel">
+            <div class="header-left">
+                <div class="brand-pill">
+                    <span class="live-pulse"></span>
+                    <span class="brand-title">EV INFRASTRUCTURE PLANNER</span>
+                    <span class="brand-badge">REAL EARTH • DAA</span>
+                </div>
+
+                <form id="search-form" class="search-box">
+                    <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                    <input type="text" id="location-input" placeholder="Search city or area (e.g. Bhubaneswar, Delhi, London, New York)..." autocomplete="off" required>
+                    <div class="search-radius-wrapper">
+                        <label for="radius-select">Radius:</label>
+                        <select id="radius-select">
+                            <option value="15">15 km</option>
+                            <option value="25" selected>25 km</option>
+                            <option value="40">40 km</option>
+                            <option value="60">60 km</option>
+                        </select>
+                    </div>
+                    <button type="submit" id="search-btn" class="primary-btn">
+                        <span>Search</span>
+                    </button>
+                </form>
+
+                <!-- EV Planning Tools Toolbar -->
+                <div class="planning-toolbar">
+                    <button id="drop-station-tool-btn" class="tool-btn" title="Click anywhere on map to place a candidate station">
+                        <span class="tool-icon">📍</span>
+                        <span>Drop Station</span>
+                    </button>
+                    <button id="generate-candidates-btn" class="tool-btn" title="Suggest strategic regional candidate hubs around current area">
+                        <span class="tool-icon">⚡</span>
+                        <span>Suggest Hubs</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="header-right">
+                <!-- Map Tile Layer Switcher -->
+                <div class="layer-switcher-pill glass-pill">
+                    <button class="layer-opt-btn" data-layer="google-earth" title="Google Earth Satellite View">🛰️ Satellite</button>
+                    <button class="layer-opt-btn" data-layer="google-hybrid" title="Google Earth Satellite + Road Labels">🌍 Hybrid</button>
+                    <button class="layer-opt-btn active" data-layer="carto-dark" title="Dark CartoDB GIS">🏙️ Dark GIS</button>
+                    <button class="layer-opt-btn" data-layer="osm-streets" title="OpenStreetMap Streets">🗺️ Streets</button>
+                </div>
+
+                <button id="reset-btn" class="icon-btn-text" title="Reset all layers and return to clean real Earth map">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+                        <path d="M3 3v5h5"></path>
+                    </svg>
+                    <span>Clear</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Left Drawer: Stations & Candidates Ledger -->
+        <aside id="stations-drawer" class="glass-panel drawer-closed">
+            <div class="drawer-header">
+                <div>
+                    <h2 class="drawer-title">Candidate Stations Ledger</h2>
+                    <p class="drawer-subtitle" id="stations-subtitle">Select candidate sites or drop new stations on the real map</p>
+                </div>
+                <button id="close-drawer-btn" class="close-btn" title="Close drawer">&times;</button>
+            </div>
+
+            <!-- Empty / Initial State -->
+            <div id="stations-empty-state" class="empty-state-card">
+                <div class="empty-icon">🌍</div>
+                <h3>Real Earth Planning Ready</h3>
+                <p>Type a city in the search bar above, or click <strong>"📍 Drop Station"</strong> to place candidate charging locations directly on the real map.</p>
+                <div style="margin-top: 14px;">
+                    <button id="quick-demo-city-btn" class="secondary-btn">Try "Bhubaneswar" (Live Real Data)</button>
+                </div>
+            </div>
+
+            <!-- Loading Spinner -->
+            <div id="stations-loading" class="loading-state hidden">
+                <div class="spinner"></div>
+                <p>Querying real geographic coordinates and EV charging points...</p>
+            </div>
+
+            <!-- Stations List Content -->
+            <div id="stations-content" class="drawer-body hidden">
+                <div class="selection-actions-bar">
+                    <span id="selected-counter" class="counter-badge">0 Candidate Sites</span>
+                    <div class="action-buttons-group">
+                        <button id="select-all-btn" class="text-link-btn">Select All</button>
+                        <button id="deselect-all-btn" class="text-link-btn">Clear</button>
+                    </div>
+                </div>
+
+                <div class="info-callout">
+                    <span class="info-icon">ℹ️</span>
+                    <span><strong>Academic DAA Separation:</strong> Coordinates come from live real-world APIs or your map placements. Installation costs (₹) and benefit values are user-configured below for 0/1 Knapsack optimization.</span>
+                </div>
+
+                <div id="stations-list" class="station-cards-container">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+        </aside>
+
+        <!-- Right Floating Deck: DAA Algorithm Controls -->
+        <aside id="algorithm-deck" class="glass-panel">
+            <div class="deck-tabs">
+                <button class="deck-tab active" data-tab="mst">1. Kruskal MST</button>
+                <button class="deck-tab" data-tab="dijkstra">2. Shortest Path</button>
+                <button class="deck-tab" data-tab="knapsack">3. 0/1 Knapsack</button>
+            </div>
+
+            <div class="deck-content">
+                <!-- Tab 1: Kruskal's MST -->
+                <div id="tab-mst" class="tab-pane active">
+                    <div class="tab-header">
+                        <h3>Power Backbone Extraction</h3>
+                        <span class="complexity-tag">O(E log V)</span>
+                    </div>
+                    <p class="tab-desc">Our hand-written Kruskal's algorithm computes the minimum spanning tree over real road-network distances, constructing the high-voltage electrical feeder backbone.</p>
+
+                    <div class="input-field-group">
+                        <label for="feeder-cost-input">Feeder Cable Cost per km (₹):</label>
+                        <input type="number" id="feeder-cost-input" value="25000" min="1000" step="5000">
+                    </div>
+
+                    <button id="run-mst-btn" class="action-btn" disabled>
+                        <span>Run Kruskal's MST</span>
+                    </button>
+
+                    <div id="mst-results" class="results-container hidden">
+                        <!-- Filled after execution -->
+                    </div>
+                </div>
+
+                <!-- Tab 2: Dijkstra's Shortest Path -->
+                <div id="tab-dijkstra" class="tab-pane">
+                    <div class="tab-header">
+                        <h3>Shortest Path Routing</h3>
+                        <span class="complexity-tag">O((V+E) log V)</span>
+                    </div>
+                    <p class="tab-desc">Our hand-written Dijkstra algorithm with binary min-heap relaxation calculates the shortest road route. Turn-by-turn geometry is drawn from real road routing.</p>
+
+                    <!-- Route Selection Mode -->
+                    <div class="route-mode-toggle">
+                        <button id="route-mode-stations" class="mode-sub-btn active">Station-to-Station</button>
+                        <button id="route-mode-mapclick" class="mode-sub-btn">Pick on Map</button>
+                    </div>
+
+                    <div id="station-picker-container" class="route-select-grid">
+                        <div class="input-field-group">
+                            <label for="dijkstra-start-select">Origin Station:</label>
+                            <select id="dijkstra-start-select" disabled>
+                                <option value="">Select origin...</option>
+                            </select>
+                        </div>
+                        <div class="input-field-group">
+                            <label for="dijkstra-end-select">Destination Station:</label>
+                            <select id="dijkstra-end-select" disabled>
+                                <option value="">Select destination...</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div id="mapclick-picker-container" class="mapclick-box hidden">
+                        <div class="mapclick-row">
+                            <button id="pick-origin-btn" class="pick-map-btn">📍 Click Origin on Map</button>
+                            <span id="origin-coord-label" class="coord-tag">Not selected</span>
+                        </div>
+                        <div class="mapclick-row">
+                            <button id="pick-dest-btn" class="pick-map-btn">🏁 Click Destination on Map</button>
+                            <span id="dest-coord-label" class="coord-tag">Not selected</span>
+                        </div>
+                    </div>
+
+                    <button id="run-dijkstra-btn" class="action-btn" disabled>
+                        <span>Find Shortest Path (Dijkstra)</span>
+                    </button>
+
+                    <div id="dijkstra-results" class="results-container hidden">
+                        <!-- Filled after execution -->
+                    </div>
+                </div>
+
+                <!-- Tab 3: 0/1 Knapsack DP -->
+                <div id="tab-knapsack" class="tab-pane">
+                    <div class="tab-header">
+                        <h3>Capital Budget Optimization</h3>
+                        <span class="complexity-tag">O(n • B') Pseudo-P</span>
+                    </div>
+                    <p class="tab-desc">Our hand-written 2D Dynamic Programming algorithm selects the highest-benefit EV station subset under your installation budget constraint.</p>
+
+                    <div class="input-field-group">
+                        <label for="knapsack-budget-input">Municipal Budget Limit (₹ INR):</label>
+                        <input type="number" id="knapsack-budget-input" value="500000" min="10000" step="25000">
+                    </div>
+
+                    <button id="run-knapsack-btn" class="action-btn" disabled>
+                        <span>Run 0/1 Knapsack DP</span>
+                    </button>
+
+                    <div id="knapsack-results" class="results-container hidden">
+                        <!-- Filled after execution -->
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Toggle Drawer Button -->
+        <button id="toggle-drawer-btn" class="glass-pill drawer-toggle-btn" title="View Stations Ledger">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18 8h1a4 4 0 0 1 0 8h-1"></path>
+                <path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path>
+                <line x1="6" y1="1" x2="6" y2="4"></line>
+                <line x1="10" y1="1" x2="10" y2="4"></line>
+                <line x1="14" y1="1" x2="14" y2="4"></line>
+            </svg>
+            <span id="drawer-toggle-text">Candidate Stations (0)</span>
+        </button>
+
+        <!-- Map Legend Floating Pill -->
+        <div id="map-legend" class="glass-panel">
+            <div class="legend-item"><span class="legend-dot dot-station"></span> Real Station</div>
+            <div class="legend-item"><span class="legend-dot dot-candidate"></span> Candidate</div>
+            <div class="legend-item"><span class="legend-line line-mst"></span> MST Feeder</div>
+            <div class="legend-item"><span class="legend-line line-dijkstra"></span> Dijkstra Route</div>
+            <div class="legend-item"><span class="legend-dot dot-optimal"></span> Knapsack Optimal</div>
+        </div>
+
+        <!-- Bottom Status Bar -->
+        <div id="status-bar" class="glass-panel">
+            <span id="status-pill" class="status-pill"><span class="status-dot"></span> Live</span>
+            <span id="status-text" class="status-text">Ready · Search a city to load real charging stations</span>
+            <span id="status-clock" class="status-clock"></span>
+        </div>
+
+        <!-- Custom Station Drop Modal -->
+        <div id="custom-station-modal" class="modal-overlay hidden">
+            <div class="modal-content glass-panel">
+                <div class="modal-header">
+                    <h3>Place Candidate Station</h3>
+                    <button id="close-modal-btn" class="close-btn" title="Close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p class="modal-coords-label" id="modal-coords">Coordinates: Lat ..., Lon ...</p>
+                    <div class="input-field-group">
+                        <label for="custom-name-inp">Station Name:</label>
+                        <input type="text" id="custom-name-inp" value="Regional EV Superhub">
+                    </div>
+                    <div class="input-field-group">
+                        <label for="custom-cost-inp">Installation Cost (₹ INR):</label>
+                        <input type="number" id="custom-cost-inp" value="120000" min="10000" step="10000">
+                    </div>
+                    <div class="input-field-group">
+                        <label for="custom-value-inp">Public Benefit Value Score:</label>
+                        <input type="number" id="custom-value-inp" value="75" min="1" step="5">
+                    </div>
+                    <div class="input-field-group">
+                        <label for="custom-cap-inp">Charger Power Capacity (kW):</label>
+                        <input type="number" id="custom-cap-inp" value="150" min="30" step="30">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="cancel-modal-btn" class="secondary-btn">Cancel</button>
+                    <button id="confirm-station-btn" class="primary-btn">Add Station to Plan</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast Notification Container -->
+        <div id="toast-container" class="toast-container"></div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <!-- App Logic -->
+    <script src="/static/app.js"></script>
+</body>
+</html>

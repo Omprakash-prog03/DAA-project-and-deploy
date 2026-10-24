@@ -1,0 +1,27 @@
+# ===================================================================
+# EV Charging Station Placement & Route Planning - Docker Compose
+# ===================================================================
+services:
+  web:
+    build: .
+    image: ev-charging-planner:latest
+    container_name: ev-planner
+    ports:
+      - "8085:8085"
+    environment:
+      # API keys (leave empty for OSM-only free tier)
+      OPENCHARGEMAP_API_KEY: ${OPENCHARGEMAP_API_KEY:-}
+      OPENROUTESERVICE_API_KEY: ${OPENROUTESERVICE_API_KEY:-}
+      HEIGIT_API_KEY: ${HEIGIT_API_KEY:-}
+      # Server
+      APP_HOST: 0.0.0.0
+      APP_PORT: 8085
+      # Security (override for your deployment domain)
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8085,http://127.0.0.1:8085}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8085/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
