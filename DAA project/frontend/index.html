@@ -3,16 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EV Charging Station Placement & Route Planning | Real Earth GIS Application</title>
-    
-    <!-- Google Fonts: Plus Jakarta Sans -->
+    <title>EV Charging Station Placement & Route Planning | Real Earth GIS</title>
+
+    <!-- Google Fonts: Plus Jakarta Sans + JetBrains Mono -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
     <!-- Leaflet Map CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
-    
+
     <!-- Custom Glass GIS CSS -->
     <link rel="stylesheet" href="/static/style.css">
 </head>
@@ -29,7 +29,7 @@
                     <span class="brand-title">EV INFRASTRUCTURE PLANNER</span>
                     <span class="brand-badge">REAL EARTH • DAA</span>
                 </div>
-                
+
                 <form id="search-form" class="search-box">
                     <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="11" cy="11" r="8"></circle>
@@ -64,7 +64,7 @@
             </div>
 
             <div class="header-right">
-                <!-- Google Earth & Map Tile Layer Switcher -->
+                <!-- Map Tile Layer Switcher -->
                 <div class="layer-switcher-pill glass-pill">
                     <button class="layer-opt-btn" data-layer="google-earth" title="Google Earth Satellite View">🛰️ Satellite</button>
                     <button class="layer-opt-btn" data-layer="google-hybrid" title="Google Earth Satellite + Road Labels">🌍 Hybrid</button>
@@ -89,7 +89,7 @@
                     <h2 class="drawer-title">Candidate Stations Ledger</h2>
                     <p class="drawer-subtitle" id="stations-subtitle">Select candidate sites or drop new stations on the real map</p>
                 </div>
-                <button id="close-drawer-btn" class="close-btn">&times;</button>
+                <button id="close-drawer-btn" class="close-btn" title="Close drawer">&times;</button>
             </div>
 
             <!-- Empty / Initial State -->
@@ -111,7 +111,7 @@
             <!-- Stations List Content -->
             <div id="stations-content" class="drawer-body hidden">
                 <div class="selection-actions-bar">
-                    <span id="selected-counter" class="counter-badge">0 / 0 Selected</span>
+                    <span id="selected-counter" class="counter-badge">0 Candidate Sites</span>
                     <div class="action-buttons-group">
                         <button id="select-all-btn" class="text-link-btn">Select All</button>
                         <button id="deselect-all-btn" class="text-link-btn">Clear</button>
@@ -145,7 +145,7 @@
                         <span class="complexity-tag">O(E log V)</span>
                     </div>
                     <p class="tab-desc">Our hand-written Kruskal's algorithm computes the minimum spanning tree over real road-network distances, constructing the high-voltage electrical feeder backbone.</p>
-                    
+
                     <div class="input-field-group">
                         <label for="feeder-cost-input">Feeder Cable Cost per km (₹):</label>
                         <input type="number" id="feeder-cost-input" value="25000" min="1000" step="5000">
@@ -254,12 +254,19 @@
             <div class="legend-item"><span class="legend-dot dot-optimal"></span> Knapsack Optimal</div>
         </div>
 
+        <!-- Bottom Status Bar -->
+        <div id="status-bar" class="glass-panel">
+            <span id="status-pill" class="status-pill"><span class="status-dot"></span> Live</span>
+            <span id="status-text" class="status-text">Ready · Search a city to load real charging stations</span>
+            <span id="status-clock" class="status-clock"></span>
+        </div>
+
         <!-- Custom Station Drop Modal -->
         <div id="custom-station-modal" class="modal-overlay hidden">
             <div class="modal-content glass-panel">
                 <div class="modal-header">
                     <h3>Place Candidate Station</h3>
-                    <button id="close-modal-btn" class="close-btn">&times;</button>
+                    <button id="close-modal-btn" class="close-btn" title="Close">&times;</button>
                 </div>
                 <div class="modal-body">
                     <p class="modal-coords-label" id="modal-coords">Coordinates: Lat ..., Lon ...</p>
@@ -286,6 +293,9 @@
                 </div>
             </div>
         </div>
+
+        <!-- Toast Notification Container -->
+        <div id="toast-container" class="toast-container"></div>
     </div>
 
     <!-- Leaflet JS -->

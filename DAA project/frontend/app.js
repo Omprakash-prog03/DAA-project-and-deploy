@@ -13,7 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
         dijkstraResult: null,
         knapsackResult: null,
         activeTab: 'mst',
-        
+
         // Planning & Routing State
         isDroppingStation: false,
         pendingDropCoords: null,
@@ -128,12 +128,58 @@ document.addEventListener('DOMContentLoaded', () => {
     const customValueInp = document.getElementById('custom-value-inp');
     const customCapInp = document.getElementById('custom-cap-inp');
 
-    // 5. GOOGLE EARTH / TILE LAYER SWITCHER LOGIC
+    // Status bar elements
+    const statusPill = document.getElementById('status-pill');
+    const statusText = document.getElementById('status-text');
+    const statusClock = document.getElementById('status-clock');
+
+    // 5. STATUS BAR & CLOCK
+    function setStatus(kind, text) {
+        // kind: 'live' | 'busy' | 'error' | 'ready'
+        statusPill.className = 'status-pill' + (kind === 'busy' ? ' busy' : kind === 'error' ? ' error' : '');
+        const label = kind === 'busy' ? 'Busy' : kind === 'error' ? 'Error' : 'Live';
+        statusPill.innerHTML = `<span class="status-dot"></span> ${label}`;
+        statusText.innerHTML = text;
+    }
+
+    function updateClock() {
+        const now = new Date();
+        statusClock.textContent = now.toLocaleTimeString('en-GB', { hour12: false });
+    }
+    updateClock();
+    setInterval(updateClock, 1000);
+
+    setStatus('live', 'Ready · Search a city to load real charging stations');
+
+    // 6. TOAST NOTIFICATIONS
+    const toastContainer = document.getElementById('toast-container');
+
+    function showToast(kind, title, message, timeout = 5000) {
+        const icons = { success: '✅', error: '⚠️', info: 'ℹ️', warning: '⚡' };
+        const toast = document.createElement('div');
+        toast.className = `toast toast-${kind}`;
+        toast.innerHTML = `
+            <span class="toast-icon">${icons[kind] || 'ℹ️'}</span>
+            <div class="toast-body">
+                <div class="toast-title">${escapeHtml(title)}</div>
+                <div class="toast-msg">${escapeHtml(message)}</div>
+            </div>
+        `;
+        toastContainer.appendChild(toast);
+        const remove = () => {
+            toast.classList.add('out');
+            setTimeout(() => toast.remove(), 220);
+        };
+        toast.addEventListener('click', remove);
+        if (timeout > 0) setTimeout(remove, timeout);
+    }
+
+    // 7. GOOGLE EARTH / TILE LAYER SWITCHER LOGIC
     document.querySelectorAll('.layer-opt-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             const layerKey = btn.dataset.layer;
             if (!tileLayers[layerKey] || currentTileLayer === tileLayers[layerKey]) return;
-            
+
             map.removeLayer(currentTileLayer);
             currentTileLayer = tileLayers[layerKey];
             currentTileLayer.addTo(map);
@@ -145,10 +191,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
             document.querySelectorAll('.layer-opt-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
+            setStatus('live', `Map layer: ${btn.textContent.trim()}`);
         });
     });
 
-    // 6. TAB NAVIGATION
+    // 8. TAB NAVIGATION
     deckTabs.forEach(tab => {
         tab.addEventListener('click', () => {
             const target = tab.dataset.tab;
@@ -171,7 +218,7 @@ document.addEventListener('DOMContentLoaded', () => {
         stationsDrawer.classList.add('drawer-closed');
     });
 
-    // 7. LOCATION SEARCH & REAL CHARGING STATIONS FETCH
+    // 9. LOCATION SEARCH & REAL CHARGING STATIONS FETCH
     async function searchLocation(query) {
         if (!query) return;
 
@@ -181,6 +228,7 @@ document.addEventListener('DOMContentLoaded', () => {
         stationsEmptyState.classList.add('hidden');
         stationsContent.classList.add('hidden');
         stationsLoading.classList.remove('hidden');
+        setStatus('busy', `Searching real geographic data for <strong>${escapeHtml(query)}</strong>...`);
 
         try {
             // STEP 1: Geocode location via real geocoding service
@@ -209,10 +257,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const stations = await stationsResp.json();
             state.realStations = stations;
+            setStatus('live', `Loaded <strong>${stations.length}</strong> real charging station(s) near <strong>${escapeHtml(query)}</strong>`);
             renderRealStations(stations);
 
         } catch (error) {
-            alert(`Search Error: ${error.message}`);
+            showToast('error', 'Search failed', error.message, 7000);
             stationsLoading.classList.add('hidden');
             stationsEmptyState.classList.remove('hidden');
             stationsEmptyState.innerHTML = `
@@ -220,6 +269,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <h3>Search Notice</h3>
                 <p>${escapeHtml(error.message)}</p>
             `;
+            setStatus('error', 'Search failed — please verify your query or network connection');
         } finally {
             searchBtn.disabled = false;
             searchBtn.innerHTML = '<span>Search</span>';
@@ -238,7 +288,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // 8. RENDER REAL CHARGING STATIONS
+    // 10. RENDER REAL CHARGING STATIONS
     function renderRealStations(stations) {
         stationsLoading.classList.add('hidden');
         layers.stations.clearLayers();
@@ -413,10 +463,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // 9. CANDIDATE MARKERS AND METRICS UPDATE
+    // 11. CANDIDATE MARKERS AND METRICS UPDATE
     function updateCandidateMarkers() {
         layers.candidates.clearLayers();
-        selectedCounter.textContent = `${state.candidates.size} Candidate Sites Selected`;
+        selectedCounter.textContent = `${state.candidates.size} Candidate Sites`;
         drawerToggleText.textContent = `Candidate Stations (${state.candidates.size})`;
 
         state.candidates.forEach(cand => {
@@ -470,7 +520,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // 10. INTERACTIVE EV STATION PLACEMENT ("📍 Drop Station")
+    // 12. INTERACTIVE EV STATION PLACEMENT ("📍 Drop Station")
     dropStationToolBtn.addEventListener('click', () => {
         state.isDroppingStation = !state.isDroppingStation;
         state.pickingMode = null;
@@ -479,9 +529,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (state.isDroppingStation) {
             dropStationToolBtn.classList.add('active');
             document.getElementById('map').classList.add('cursor-crosshair');
+            setStatus('live', 'Click anywhere on the real map to place a candidate station');
         } else {
             dropStationToolBtn.classList.remove('active');
             document.getElementById('map').classList.remove('cursor-crosshair');
+            setStatus('live', 'Station placement mode cancelled');
         }
     });
 
@@ -600,9 +652,11 @@ document.addEventListener('DOMContentLoaded', () => {
         renderCandidateLedgerCards();
         updateCandidateMarkers();
         updateAlgorithmControlsState();
+        showToast('success', 'Candidate station placed', `${name} added to your planning set at (${newStation.latitude.toFixed(4)}, ${newStation.longitude.toFixed(4)})`);
+        setStatus('live', `Placed candidate station <strong>${escapeHtml(name)}</strong> on the real map`);
     });
 
-    // 11. REGIONAL CANDIDATE HUBS GENERATOR ("⚡ Suggest Hubs")
+    // 13. REGIONAL CANDIDATE HUBS GENERATOR ("⚡ Suggest Hubs")
     function generateRegionalCandidateHubs() {
         const center = map.getCenter();
         const lat = center.lat;
@@ -648,11 +702,13 @@ document.addEventListener('DOMContentLoaded', () => {
         // Fit map bounds to candidate cluster
         const bounds = L.latLngBounds(Array.from(state.candidates.values()).map(c => [c.latitude, c.longitude]));
         map.fitBounds(bounds, { padding: [50, 50] });
+        showToast('success', 'Candidate hubs suggested', '6 strategic regional hubs added around the current map center');
+        setStatus('live', 'Generated <strong>6</strong> regional candidate hubs for planning');
     }
 
     generateCandidatesBtn.addEventListener('click', generateRegionalCandidateHubs);
 
-    // 12. DIJKSTRA ROUTE MODE TOGGLES & PICK-ON-MAP
+    // 14. DIJKSTRA ROUTE MODE TOGGLES & PICK-ON-MAP
     function resetPickingButtonsUI() {
         pickOriginBtn.classList.remove('picking');
         pickDestBtn.classList.remove('picking');
@@ -689,6 +745,7 @@ document.addEventListener('DOMContentLoaded', () => {
         pickOriginBtn.innerHTML = '🎯 Click Map for Origin...';
         pickDestBtn.classList.remove('picking');
         document.getElementById('map').classList.add('cursor-crosshair');
+        setStatus('live', 'Click the map to set the route origin');
     });
 
     pickDestBtn.addEventListener('click', () => {
@@ -699,9 +756,10 @@ document.addEventListener('DOMContentLoaded', () => {
         pickDestBtn.innerHTML = '🎯 Click Map for Destination...';
         pickOriginBtn.classList.remove('picking');
         document.getElementById('map').classList.add('cursor-crosshair');
+        setStatus('live', 'Click the map to set the route destination');
     });
 
-    // 13. EXECUTE KRUSKAL'S MST ALGORITHM
+    // 15. EXECUTE KRUSKAL'S MST ALGORITHM
     runMstBtn.addEventListener('click', async () => {
         const cands = Array.from(state.candidates.values());
         if (cands.length < 2) return;
@@ -710,6 +768,7 @@ document.addEventListener('DOMContentLoaded', () => {
         runMstBtn.innerHTML = '<span>Computing Real Road MST...</span>';
         mstResults.classList.add('hidden');
         layers.mst.clearLayers();
+        setStatus('busy', "Running Kruskal's MST over the real road-network graph...");
 
         try {
             const feederCost = parseInt(feederCostInput.value) || 25000;
@@ -777,16 +836,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     Data Source: ${escapeHtml(mstData.algorithm_info.road_data_source || 'OSM Real Road Network')}
                 </div>
             `;
+            showToast('success', 'MST complete', `Kruskal's algorithm built a ${mstData.accepted_edges.length}-link backbone of ${mstData.total_backbone_km} km`);
+            setStatus('live', `MST complete · <strong>${mstData.total_backbone_km} km</strong> backbone · ₹${mstData.backbone_cost.toLocaleString()} feeder cost`);
 
         } catch (error) {
-            alert(`MST Error: ${error.message}`);
+            showToast('error', 'MST failed', error.message, 7000);
+            setStatus('error', 'MST execution failed');
         } finally {
             runMstBtn.disabled = false;
             runMstBtn.innerHTML = '<span>Run Kruskal\'s MST</span>';
         }
     });
 
-    // 14. EXECUTE DIJKSTRA'S SHORTEST PATH ALGORITHM
+    // 16. EXECUTE DIJKSTRA'S SHORTEST PATH ALGORITHM
     runDijkstraBtn.addEventListener('click', async () => {
         const cands = Array.from(state.candidates.values());
         let requestPayload = {};
@@ -795,11 +857,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const startId = dijkstraStartSelect.value;
             const endId = dijkstraEndSelect.value;
             if (!startId || !endId) {
-                alert('Please select both Origin and Destination stations.');
+                showToast('warning', 'Missing selection', 'Please select both Origin and Destination stations.');
                 return;
             }
             if (startId === endId) {
-                alert('Origin and Destination must be distinct stations.');
+                showToast('warning', 'Invalid selection', 'Origin and Destination must be distinct stations.');
                 return;
             }
             requestPayload = {
@@ -810,7 +872,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             // Mapclick Mode
             if (!state.pickedOrigin || !state.pickedDest) {
-                alert('Please click both Origin and Destination on the map first.');
+                showToast('warning', 'Missing points', 'Please click both Origin and Destination on the map first.');
                 return;
             }
             requestPayload = {
@@ -828,6 +890,7 @@ document.addEventListener('DOMContentLoaded', () => {
         runDijkstraBtn.innerHTML = '<span>Relaxing Graph Edges...</span>';
         dijkstraResults.classList.add('hidden');
         layers.dijkstra.clearLayers();
+        setStatus('busy', 'Running Dijkstra shortest-path relaxation over the road graph...');
 
         try {
             const resp = await fetch('/api/dijkstra', {
@@ -848,7 +911,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (dijkData.road_geometry_geojson && dijkData.road_geometry_geojson.length > 0) {
                 // Leaflet expects [lat, lon], GeoJSON is [lon, lat]
                 const latLngs = dijkData.road_geometry_geojson.map(c => [c[1], c[0]]);
-                
+
                 // Add outer glow
                 L.polyline(latLngs, {
                     color: '#00E5FF',
@@ -888,23 +951,26 @@ document.addEventListener('DOMContentLoaded', () => {
                     Algorithm: Dijkstra Binary Heap | Real Road Network OSRM/ORS
                 </div>
             `;
+            showToast('success', 'Shortest path found', `${dijkData.total_distance_km} km via ${dijkData.path_node_names.length} waypoints`);
+            setStatus('live', `Dijkstra complete · <strong>${dijkData.total_distance_km} km</strong> shortest route · ${dijkData.estimated_time_min} min estimated`);
 
         } catch (error) {
-            alert(`Dijkstra Error: ${error.message}`);
+            showToast('error', 'Dijkstra failed', error.message, 7000);
+            setStatus('error', 'Dijkstra execution failed');
         } finally {
             runDijkstraBtn.disabled = false;
             runDijkstraBtn.innerHTML = '<span>Find Shortest Path (Dijkstra)</span>';
         }
     });
 
-    // 15. EXECUTE 0/1 KNAPSACK DP ALGORITHM
+    // 17. EXECUTE 0/1 KNAPSACK DP ALGORITHM
     runKnapsackBtn.addEventListener('click', async () => {
         const cands = Array.from(state.candidates.values());
         if (cands.length === 0) return;
 
         const budget = parseInt(knapsackBudgetInput.value) || 0;
         if (budget <= 0) {
-            alert('Please enter a positive municipal budget limit.');
+            showToast('warning', 'Invalid budget', 'Please enter a positive municipal budget limit.');
             return;
         }
 
@@ -912,6 +978,7 @@ document.addEventListener('DOMContentLoaded', () => {
         runKnapsackBtn.innerHTML = '<span>Building DP Table...</span>';
         knapsackResults.classList.add('hidden');
         layers.knapsack.clearLayers();
+        setStatus('busy', 'Solving 0/1 Knapsack DP for optimal station allocation...');
 
         try {
             const resp = await fetch('/api/knapsack', {
@@ -982,16 +1049,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 ` : ''}
             `;
+            showToast('success', 'Budget optimization complete', `Selected ${knapData.selected_stations.length} station(s) for ₹${knapData.total_installation_cost.toLocaleString()} (${knapData.budget_utilization_pct}% budget used)`);
+            setStatus('live', `Knapsack optimal · <strong>${knapData.selected_stations.length}</strong> station(s) · +${knapData.total_value_benefit} benefit pts`);
 
         } catch (error) {
-            alert(`Knapsack Error: ${error.message}`);
+            showToast('error', 'Knapsack failed', error.message, 7000);
+            setStatus('error', 'Knapsack execution failed');
         } finally {
             runKnapsackBtn.disabled = false;
             runKnapsackBtn.innerHTML = '<span>Run 0/1 Knapsack DP</span>';
         }
     });
 
-    // 16. RESET / CLEAR ANALYSIS
+    // 18. RESET / CLEAR ANALYSIS
     resetBtn.addEventListener('click', () => {
         Object.values(layers).forEach(layer => layer.clearLayers());
         state.realStations = [];
@@ -1022,6 +1092,8 @@ document.addEventListener('DOMContentLoaded', () => {
         locationInput.value = '';
         map.setView([20.5937, 78.9629], 5);
         updateAlgorithmControlsState();
+        setStatus('live', 'Ready · Search a city to load real charging stations');
+        showToast('info', 'Map cleared', 'All layers and candidates have been reset');
     });
 
     // Utility escapeHtml
