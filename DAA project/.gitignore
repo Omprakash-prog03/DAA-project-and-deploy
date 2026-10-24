@@ -23,3 +23,4 @@ env/
 # Build outputs
 dist/
 build/
+data/*.db
