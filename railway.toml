@@ -1,0 +1,14 @@
+[service.ev-charging-planner]
+# Railway auto-detects the Procfile. This is optional config.
+# The service name is used as the default instance name.
+
+[build]
+# Railway reads Procfile automatically. No build command needed.
+# If you want to use Docker instead, add:
+#   [build]
+#   image = "python:3.11-slim"
+
+[run]
+# Railway uses PORT env var automatically (provided by Railway).
+# The Procfile's web command binds to $PORT.
+
